@@ -1,0 +1,1227 @@
+<title>PULSE-LTE Control Room</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: network-operations console. Control strip on top, map + two resource grids side by side, KPI ledger below. */
+:root {
+  --bg: #f3f4f1;
+  --panel: #fbfbf9;
+  --ink: #15191c;
+  --ink-2: #4d5459;
+  --ink-3: #7c8388;
+  --rule: #dcdfdb;
+  --accent: #0f6e78;          /* PULSE teal */
+  --accent-soft: #d6ebec;
+  --base: #8a6d3b;            /* baseline bronze */
+  --voip: #2a78d6;
+  --video: #eb6834;
+  --be: #1baf7a;
+  --err: #15191c;
+  --idle: #e9ebe7;
+  --sleep: #d9e6ef;
+  --good: #1d7a3a;
+  --bad: #b3362f;
+  --display: "Chakra Petch", "Bahnschrift", "DIN Alternate", system-ui, sans-serif;
+  --body: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #101416; --panel: #161b1e; --ink: #e8ecea; --ink-2: #b2bab8; --ink-3: #848d8c;
+    --rule: #2a3135; --accent: #4fb3bd; --accent-soft: #173a3e; --base: #c9a46a;
+    --voip: #3987e5; --video: #d95926; --be: #199e70; --err: #f2f4f3; --idle: #1e2427;
+    --sleep: #1b2b38; --good: #5cc27a; --bad: #ec6b62; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #101416; --panel: #161b1e; --ink: #e8ecea; --ink-2: #b2bab8; --ink-3: #848d8c;
+  --rule: #2a3135; --accent: #4fb3bd; --accent-soft: #173a3e; --base: #c9a46a;
+  --voip: #3987e5; --video: #d95926; --be: #199e70; --err: #f2f4f3; --idle: #1e2427;
+  --sleep: #1b2b38; --good: #5cc27a; --bad: #ec6b62; color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body {
+  background: var(--bg); color: var(--ink); font-family: var(--body); font-size: 14px; line-height: 1.45;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 18px 32px;
+}
+.wrap { max-width: 1240px; margin: 0 auto; display: grid; gap: 16px; }
+header { display: flex; flex-wrap: wrap; align-items: end; justify-content: space-between; gap: 12px; }
+h1 { font-family: var(--display); font-weight: 700; font-size: 1.9rem; letter-spacing: 0.01em; margin: 0; line-height: 1.05; text-wrap: balance; }
+h1 span { color: var(--accent); }
+.sub { color: var(--ink-2); margin: 4px 0 0; max-width: 68ch; }
+.clock { font-family: var(--mono); font-size: 0.85rem; color: var(--ink-2); text-align: right; font-variant-numeric: tabular-nums; }
+.clock b { font-family: var(--display); font-size: 1.35rem; color: var(--ink); font-weight: 600; display: block; }
+
+.controls { display: flex; flex-wrap: wrap; gap: 10px 22px; align-items: center; padding: 12px 14px; background: var(--panel); border: 1px solid var(--rule); border-radius: 6px; }
+.ctl { display: flex; align-items: center; gap: 8px; }
+.lbl { font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--ink-3); font-weight: 600; }
+input[type=range] { width: 130px; accent-color: var(--accent); }
+.val { font-family: var(--mono); font-size: 0.85rem; min-width: 3.4em; font-variant-numeric: tabular-nums; }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.chip { font: 500 0.8rem var(--body); border: 1px solid var(--rule); background: transparent; color: var(--ink-2); padding: 5px 10px; border-radius: 999px; cursor: pointer; }
+.chip[aria-pressed="true"] { background: var(--accent-soft); border-color: var(--accent); color: var(--ink); }
+.chip:focus-visible, .btn:focus-visible, select:focus-visible, input:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.btn { font: 600 0.82rem var(--body); border: 1px solid var(--ink); background: var(--ink); color: var(--panel); padding: 6px 12px; border-radius: 4px; cursor: pointer; }
+.btn.ghost { background: transparent; color: var(--ink); }
+.btn.surge[aria-pressed="true"] { background: var(--bad); border-color: var(--bad); color: #fff; }
+select { font: 0.85rem var(--body); background: var(--panel); color: var(--ink); border: 1px solid var(--rule); border-radius: 4px; padding: 4px 6px; }
+
+.stage { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.25fr); gap: 16px; }
+.panel { background: var(--panel); border: 1px solid var(--rule); border-radius: 6px; padding: 14px; min-width: 0; display: grid; gap: 10px; align-content: start; }
+.ph { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; flex-wrap: wrap; }
+.ph h2 { font-family: var(--display); font-size: 1.05rem; font-weight: 600; margin: 0; letter-spacing: 0.02em; }
+.note { color: var(--ink-3); font-size: 0.8rem; margin: 0; }
+canvas { display: block; width: 100%; }
+#map { aspect-ratio: 1 / 0.92; max-width: 100%; cursor: pointer; }
+.grids { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+.grid-col { min-width: 0; display: grid; gap: 6px; }
+.gtitle { font-family: var(--display); font-weight: 600; font-size: 0.95rem; display: flex; align-items: center; gap: 6px; }
+.gtitle i { width: 10px; height: 10px; border-radius: 2px; display: inline-block; }
+.rg { aspect-ratio: 25 / 30; max-width: 100%; border: 1px solid var(--rule); border-radius: 3px; }
+.axis { display: flex; justify-content: space-between; font-family: var(--mono); font-size: 0.7rem; color: var(--ink-3); }
+.legend { display: flex; flex-wrap: wrap; gap: 6px 14px; font-size: 0.78rem; color: var(--ink-2); }
+.legend span { display: inline-flex; align-items: center; gap: 5px; }
+.sw { width: 11px; height: 11px; border-radius: 2px; display: inline-block; border: 1px solid var(--rule); }
+
+.lower { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr); gap: 16px; }
+.ledger-wrap { overflow-x: auto; }
+table { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
+th, td { padding: 7px 8px; text-align: right; border-bottom: 1px solid var(--rule); white-space: nowrap; }
+th:first-child, td:first-child { text-align: left; white-space: normal; }
+thead th { font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.07em; color: var(--ink-3); font-weight: 600; }
+td.num { font-family: var(--mono); font-size: 0.88rem; }
+td .unit { color: var(--ink-3); font-size: 0.75rem; }
+.delta { font-family: var(--mono); font-size: 0.8rem; padding: 2px 7px; border-radius: 999px; }
+.delta.good { color: var(--good); background: color-mix(in srgb, var(--good) 12%, transparent); }
+.delta.bad { color: var(--bad); background: color-mix(in srgb, var(--bad) 12%, transparent); }
+.delta.flat { color: var(--ink-3); }
+#spark { aspect-ratio: 2.2 / 1; max-width: 100%; }
+.feat { display: grid; gap: 8px; margin: 0; padding: 0; list-style: none; }
+.feat li { display: grid; grid-template-columns: 4.2em 1fr; gap: 8px; font-size: 0.85rem; color: var(--ink-2); }
+.feat b { font-family: var(--mono); font-weight: 500; color: var(--accent); }
+
+/* experiment lab */
+.lab { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr); gap: 16px; }
+.fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px 16px; }
+.field { display: grid; gap: 4px; min-width: 0; }
+.field .row { display: flex; align-items: center; gap: 8px; }
+.field input[type=range] { width: 100%; min-width: 0; }
+.field select { width: 100%; }
+.state { font-family: var(--mono); font-size: 0.8rem; color: var(--ink-2); background: var(--idle); padding: 6px 9px; border-radius: 4px; margin: 0; }
+.btnrow { display: flex; flex-wrap: wrap; gap: 8px; }
+#ask { font: 0.92rem var(--body); width: 100%; min-height: 66px; resize: vertical; padding: 9px 10px; border-radius: 6px; border: 1px solid var(--rule); background: var(--panel); color: var(--ink); }
+#ask:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.sugg { display: flex; flex-wrap: wrap; gap: 6px; }
+.sugg button { font: 0.78rem var(--body); text-align: left; border: 1px dashed var(--rule); background: transparent; color: var(--ink-2); padding: 5px 9px; border-radius: 6px; cursor: pointer; }
+.sugg button:hover { border-color: var(--accent); color: var(--ink); }
+.trace { list-style: none; margin: 0; padding: 0; display: grid; gap: 3px; font-family: var(--mono); font-size: 0.76rem; color: var(--ink-3); }
+.trace li::before { content: "› "; color: var(--accent); }
+.answer { white-space: pre-wrap; font-size: 0.92rem; line-height: 1.55; margin: 0; max-width: 70ch; }
+.answer:empty { display: none; }
+
+/* bring-your-own-phone */
+.joingrid { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 18px; align-items: start; }
+.qr { background: #ffffff; padding: 10px; border-radius: 6px; border: 1px solid var(--rule); width: max-content; }
+.qr img, .qr canvas { display: block; width: 148px; height: 148px; }
+.linkrow { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.linkrow code { font-family: var(--mono); font-size: 0.8rem; background: var(--idle); padding: 4px 8px; border-radius: 4px; word-break: break-all; min-width: 0; }
+.pill { display: inline-flex; align-items: center; gap: 6px; font-size: 0.78rem; padding: 3px 9px; border-radius: 999px; background: var(--idle); color: var(--ink-2); }
+.pill::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: var(--ink-3); }
+.pill.on { color: var(--good); background: color-mix(in srgb, var(--good) 12%, transparent); }
+.pill.on::before { background: var(--good); }
+.pill.off { color: var(--bad); background: color-mix(in srgb, var(--bad) 10%, transparent); }
+.pill.off::before { background: var(--bad); }
+.empty { color: var(--ink-3); font-size: 0.85rem; margin: 0; }
+.phone { max-width: 460px; margin: 0 auto; display: grid; gap: 14px; }
+.phone h1 { font-size: 1.6rem; }
+.seg { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
+.seg button { font: 500 0.82rem var(--body); padding: 10px 4px; border-radius: 6px; border: 1px solid var(--rule); background: var(--panel); color: var(--ink-2); cursor: pointer; }
+.seg button[aria-pressed="true"] { border-color: var(--accent); background: var(--accent-soft); color: var(--ink); font-weight: 600; }
+.seg button:focus-visible, #nick:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+#nick { font: 0.95rem var(--body); padding: 8px 10px; border-radius: 6px; border: 1px solid var(--rule); background: var(--panel); color: var(--ink); width: 100%; }
+#pmap { aspect-ratio: 1 / 0.92; max-width: 100%; touch-action: manipulation; cursor: crosshair; }
+.radio { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.radio div { background: var(--idle); border-radius: 6px; padding: 8px 10px; min-width: 0; }
+.radio b { display: block; font-family: var(--display); font-size: 1.35rem; font-weight: 600; font-variant-numeric: tabular-nums; }
+.radio span { font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.07em; color: var(--ink-3); }
+.cellline { font-family: var(--mono); font-size: 0.85rem; color: var(--ink-2); margin: 0; }
+@media (max-width: 560px) { .joingrid { grid-template-columns: 1fr; } }
+
+@media (max-width: 900px) {
+  .stage, .lower, .lab { grid-template-columns: 1fr; }
+}
+@media (max-width: 480px) {
+  h1 { font-size: 1.5rem; }
+  .grids { gap: 8px; }
+  input[type=range] { width: 100px; }
+}
+</style>
+
+<div class="wrap">
+  <header>
+    <div>
+      <h1>PULSE<span>-LTE</span> Control Room</h1>
+      <p class="sub">Two identical 7-cell LTE networks, same users, same traffic, same fading. Left of each pair runs a standard Proportional Fair scheduler; the other runs PULSE. Change the load or trigger a stadium surge and watch the resource grids react.</p>
+    </div>
+    <div class="clock"><b id="clock">0.000 s</b>simulated time · 1 TTI = 1 ms</div>
+  </header>
+
+  <section class="controls" aria-label="Simulation controls">
+    <div class="ctl"><button class="btn" id="play" type="button">Pause</button><button class="btn ghost" id="reset" type="button">New drop</button></div>
+    <div class="ctl"><label class="lbl" for="load">Load</label><input type="range" id="load" min="0.2" max="1.6" step="0.1" value="0.6"><span class="val" id="loadv">0.6×</span></div>
+    <div class="ctl"><label class="lbl" for="speed">Speed</label>
+      <select id="speed"><option value="2">Slow</option><option value="8" selected>Normal</option><option value="30">Fast</option></select></div>
+    <div class="ctl"><span class="lbl">PULSE features</span>
+      <div class="chips" role="group" aria-label="PULSE features">
+        <button class="chip" type="button" data-f="ica" aria-pressed="true">ICA link adapt.</button>
+        <button class="chip" type="button" data-f="olla" aria-pressed="true">OLLA</button>
+        <button class="chip" type="button" data-f="sfr" aria-pressed="true">Adaptive SFR</button>
+        <button class="chip" type="button" data-f="eco" aria-pressed="true">Slack-aware DTX</button>
+      </div></div>
+    <div class="ctl"><button class="btn ghost surge" id="surge" type="button" aria-pressed="false">Stadium surge in cell 0</button></div>
+  </section>
+
+  <section class="stage">
+    <div class="panel">
+      <div class="ph"><h2>Network map</h2>
+        <div class="ctl"><label class="lbl" for="mapsrc">Showing</label>
+          <select id="mapsrc"><option value="1" selected>PULSE</option><option value="0">Prop. Fair</option></select></div></div>
+      <canvas id="map" width="560" height="515" aria-label="Hexagonal 7-cell network map"></canvas>
+      <div class="legend">
+        <span><i class="sw" style="background:var(--voip)"></i>VoIP user</span>
+        <span><i class="sw" style="background:var(--video)"></i>Video user</span>
+        <span><i class="sw" style="background:var(--be)"></i>Best-effort user</span>
+        <span><i class="sw" style="background:transparent;border:2px solid var(--ink-2);border-radius:50%"></i>Cell-edge user</span>
+        <span><i class="sw" style="background:var(--sleep)"></i>Cell asleep (DTX)</span>
+      </div>
+      <p class="note">Cell shade = PRB utilisation over the last 50 ms. Tap a cell to inspect its resource grid.</p>
+    </div>
+
+    <div class="panel">
+      <div class="ph"><h2>Resource grid · <span id="cellname">cell 0 (centre)</span></h2><p class="note">25 PRBs × last 120 TTIs, newest on top</p></div>
+      <div class="grids">
+        <div class="grid-col">
+          <div class="gtitle"><i style="background:var(--base)"></i>Prop. Fair</div>
+          <canvas class="rg" id="g0" width="250" height="300"></canvas>
+          <div class="axis"><span>PRB 0</span><span>24</span></div>
+        </div>
+        <div class="grid-col">
+          <div class="gtitle"><i style="background:var(--accent)"></i>PULSE</div>
+          <canvas class="rg" id="g1" width="250" height="300"></canvas>
+          <div class="axis"><span>PRB 0</span><span>24</span></div>
+        </div>
+      </div>
+      <div class="legend">
+        <span><i class="sw" style="background:var(--voip)"></i>VoIP</span>
+        <span><i class="sw" style="background:var(--video)"></i>Video</span>
+        <span><i class="sw" style="background:var(--be)"></i>Best effort</span>
+        <span><i class="sw" style="background:var(--err)"></i>Failed block (NACK)</span>
+        <span><i class="sw" style="background:var(--idle)"></i>Unused</span>
+        <span><i class="sw" style="background:var(--sleep)"></i>Micro-sleep</span>
+      </div>
+      <p class="note">The tick bar above the PULSE grid marks this cell's power-boosted edge sub-band when SFR is on.</p>
+    </div>
+  </section>
+
+  <section class="lower">
+    <div class="panel">
+      <div class="ph"><h2>Live KPI ledger</h2><p class="note">All 7 cells, rolling 2-second window</p></div>
+      <div class="ledger-wrap"><table>
+        <thead><tr><th>Metric</th><th>Prop. Fair</th><th>PULSE</th><th>Change</th></tr></thead>
+        <tbody id="kpi"></tbody>
+      </table></div>
+    </div>
+    <div class="panel">
+      <div class="ph"><h2>Power per cell</h2><p class="note">Watts, last 6 s</p></div>
+      <canvas id="spark" width="440" height="200" aria-label="Power per cell over time"></canvas>
+      <div class="legend"><span><i class="sw" style="background:var(--base)"></i>Prop. Fair</span><span><i class="sw" style="background:var(--accent)"></i>PULSE</span></div>
+      <ul class="feat">
+        <li><b>ICA</b>Corrects stale CQI for the interference neighbours will actually cause this TTI.</li>
+        <li><b>OLLA</b>Per-user offset that steers block errors to a 10% target.</li>
+        <li><b>SFR</b>Boosts each cell's edge sub-band, sized by how much edge traffic is waiting.</li>
+        <li><b>DTX</b>Holds packets that still have delay budget so the cell can micro-sleep.</li>
+      </ul>
+    </div>
+  </section>
+
+  <section class="lab">
+    <div class="panel">
+      <div class="ph"><h2>Experiment lab</h2><p class="note">Set the conditions, then rebuild</p></div>
+      <div class="fields">
+        <div class="field"><label class="lbl" for="upc">Users per cell</label><div class="row"><input type="range" id="upc" min="5" max="25" step="1" value="15"><span class="val" id="upcv">15</span></div></div>
+        <div class="field"><label class="lbl" for="spd">User speed</label><select id="spd"><option value="3">3 km/h · walking</option><option value="30" selected>30 km/h · city car</option><option value="60">60 km/h · bus</option><option value="120">120 km/h · highway</option></select></div>
+        <div class="field"><label class="lbl" for="mixv">Voice users</label><div class="row"><input type="range" id="mixv" min="0" max="80" step="5" value="30"><span class="val" id="mixvv">30%</span></div></div>
+        <div class="field"><label class="lbl" for="mixd">Download users</label><div class="row"><input type="range" id="mixd" min="0" max="80" step="5" value="40"><span class="val" id="mixdv">40%</span></div></div>
+        <div class="field"><label class="lbl" for="cqid">CQI feedback delay</label><div class="row"><input type="range" id="cqid" min="1" max="10" step="1" value="4"><span class="val" id="cqidv">4 ms</span></div></div>
+        <div class="field"><span class="lbl">Video users</span><span class="val" id="mixvid" style="padding-top:4px">30%</span></div>
+      </div>
+      <div class="btnrow"><button class="btn" id="rebuild" type="button">Rebuild network</button></div>
+      <div class="ph" style="margin-top:6px"><h2>Live events</h2></div>
+      <div class="field"><label class="lbl" for="tool">Tapping the map will</label>
+        <select id="tool"><option value="inspect">Inspect a cell's resource grid</option><option value="fail">Fail or restore a tower</option><option value="jam">Place a jammer</option></select></div>
+      <div class="btnrow"><button class="btn ghost" id="jamoff" type="button" disabled>Remove jammer</button><button class="btn ghost" id="restore" type="button">Restore all towers</button></div>
+      <p class="state" id="labstate">All cells up · No jammer</p>
+      <p class="note">The jammer blasts PRBs 0–11 from where you tap. The controller cannot see it, so ICA cannot correct for it; OLLA has to learn it from failed blocks.</p>
+    </div>
+
+    <div class="panel" id="aipanel">
+      <div class="ph"><h2>Ask the network</h2><p class="note">An AI operator runs the experiment and explains it</p></div>
+      <textarea id="ask" placeholder="e.g. What happens to video users if cell 2 fails during rush hour?"></textarea>
+      <div class="sugg" id="sugg">
+        <button type="button">Fail cell 3 at 1.2× load. Who suffers more, PF or PULSE users?</button>
+        <button type="button">Put a jammer near cell 0 and tell me which link adaptation copes better.</button>
+        <button type="button">At what load does PULSE stop saving energy?</button>
+        <button type="button">Turn off ICA and show me what changes.</button>
+      </div>
+      <div class="btnrow"><button class="btn" id="askbtn" type="button">Run experiment</button><button class="btn ghost" id="stopbtn" type="button" hidden>Stop</button></div>
+      <ul class="trace" id="trace"></ul>
+      <p class="answer" id="answer"></p>
+      <p class="note" id="ainote">Uses your Claude account; the first question asks for permission.</p>
+    </div>
+  </section>
+
+  <section class="panel">
+    <div class="ph"><h2>Experiment log</h2>
+      <div class="btnrow"><button class="btn ghost" id="record" type="button">Record current result</button><button class="btn ghost" id="savecsv" type="button" hidden>Save as CSV</button></div></div>
+    <div class="ledger-wrap"><table>
+      <thead><tr><th>Scenario</th><th>Load</th><th>Tput PF / PULSE</th><th>BLER PF / PULSE</th><th>Video loss PF / PULSE</th><th>QoS PF / PULSE</th><th>Power PF / PULSE</th></tr></thead>
+      <tbody id="log"><tr><td colspan="7" class="empty">Record a result, or ask the AI operator to run an experiment.</td></tr></tbody>
+    </table></div>
+  </section>
+
+  <section class="panel" aria-labelledby="byoph">
+    <div class="ph"><h2 id="byoph">Bring your own phone</h2><span class="pill" id="roomstat">Connecting to room…</span></div>
+    <div class="joingrid">
+      <div class="qr" id="qr" aria-label="QR code for the join link"></div>
+      <div style="display:grid;gap:10px;min-width:0">
+        <p class="note" id="joinhelp" style="color:var(--ink-2);font-size:0.88rem">Scan with a phone that is signed in to Claude and has access to this page. The phone becomes a real user in both networks: pick a call, video or download, tap where you are standing, and see your own signal, modulation and speed under Prop. Fair and PULSE.</p>
+        <div class="linkrow"><code id="joinurl">https://claude.ai/artifact/FoGYEdRrmRJqEsS7YdLmpP#join</code><button class="btn ghost" id="copy" type="button">Copy link</button></div>
+        <div class="ledger-wrap"><table>
+          <thead><tr><th>Phone</th><th>Service</th><th>Cell</th><th>SINR</th><th>PF</th><th>PULSE</th></tr></thead>
+          <tbody id="phones"><tr><td colspan="6" class="empty">No phones joined yet.</td></tr></tbody>
+        </table></div>
+      </div>
+    </div>
+  </section>
+</div>
+
+<main class="phone" id="phoneview" hidden>
+  <header style="display:grid;gap:4px">
+    <h1>PULSE<span>-LTE</span></h1>
+    <p class="sub">You are a user in the live network on the control-room screen.</p>
+    <span class="pill" id="pstat">Connecting…</span>
+  </header>
+  <div style="display:grid;gap:6px"><label class="lbl" for="nick">Your name on the map</label><input id="nick" maxlength="14" autocomplete="off"></div>
+  <div style="display:grid;gap:6px"><span class="lbl">What is your phone doing?</span>
+    <div class="seg" role="group" aria-label="Service">
+      <button type="button" data-svc="voice" aria-pressed="false">Voice call</button>
+      <button type="button" data-svc="video" aria-pressed="true">HD video</button>
+      <button type="button" data-svc="download" aria-pressed="false">Download</button>
+      <button type="button" data-svc="idle" aria-pressed="false">Idle</button>
+    </div></div>
+  <div class="panel" style="padding:10px">
+    <div class="ph"><h2>Where are you?</h2><p class="note">Tap the map to stand there</p></div>
+    <canvas id="pmap" width="440" height="405" aria-label="Tap to choose your position in the network"></canvas>
+  </div>
+  <div class="panel">
+    <p class="cellline" id="pcell">Waiting for the control room…</p>
+    <div class="radio">
+      <div><span>SINR</span><b id="psinr">–</b></div>
+      <div><span>CQI</span><b id="pcqi">–</b></div>
+      <div><span>Modulation</span><b id="pmod">–</b></div>
+    </div>
+    <div class="ledger-wrap"><table>
+      <thead><tr><th>You get</th><th>Prop. Fair</th><th>PULSE</th></tr></thead>
+      <tbody id="pkpi"></tbody>
+    </table></div>
+    <p class="note" id="pnote">Move toward a cell edge to see how PULSE protects weak users.</p>
+  </div>
+</main>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<script>
+"use strict";
+// Runs inside Claude (artifact) or from a laptop via serve.py. Outside Claude there is no window.claude.
+const IN_CLAUDE = !!(window.claude && window.claude.use);
+const cuse = name => IN_CLAUDE ? window.claude.use(name) : Promise.resolve(null);
+// ---------------------------------------------------------------- constants (mirror pulse/config.py)
+const C = 7, MAXP = 12, NRB = 25, SB = 5, NSB = 5, JAM_RB = 12;
+let UPC = 15, U = C * UPC, UT = U + MAXP, DELAY = 4, L = DELAY + 1;   // set by the experiment lab
+let MIX = [0.3, 0.3];                                                 // voice share, video share
+const ISD = 500, RCELL = ISD / Math.sqrt(3), RE = 120;
+const PRB = Math.pow(10, 4.3) / NRB;                               // mW per PRB (43 dBm)
+const NOISE = Math.pow(10, (-174 + 10 * Math.log10(180e3) + 9) / 10);
+const CQI_DB = [-6.7, -4.7, -2.3, 0.2, 2.4, 4.3, 5.9, 8.1, 10.3, 11.7, 14.1, 16.3, 18.7, 21.0, 22.7];
+const EFF = [0, .1523, .2344, .3770, .6016, .8770, 1.1758, 1.4766, 1.9141, 2.4063, 2.7305, 3.3223, 3.9023, 4.5234, 5.1152, 5.5547];
+const VOIP = 0, VIDEO = 1, BE = 2, DEADLINE = [100, 300, 1e9];
+let RHO = 0.9701;                                                   // J0(2π fd T), 30 km/h @ 2 GHz
+const JAMP = Math.pow(10, 4.0) / JAM_RB;                            // jammer: 40 dBm (10 W) over 12 PRBs
+function j0(x) { let s = 0, t = 1; for (let k = 0; k < 8; k++) { s += t; t *= -(x * x / 4) / ((k + 1) * (k + 1)); } return s; }
+const P0 = 130, DP = 4.7, PMAX = 20, PSLEEP = 75;
+
+function rng(seed) {                                                // mulberry32
+  let a = seed >>> 0;
+  const r = () => { a = (a + 0x6D2B79F5) >>> 0; let t = a; t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61); return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
+  r.n = () => { let u = 0; while (u === 0) u = r(); return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * r()); };
+  return r;
+}
+const cqiOf = db => { let k = 0; while (k < 15 && db >= CQI_DB[k]) k++; return k; };
+const blerOf = (db, cqi) => 1 / (1 + Math.exp(1.5 * (db - CQI_DB[Math.max(cqi, 1) - 1]) + 2.197));
+
+// ---------------------------------------------------------------- world (shared topology)
+function makeWorld(seed) {
+  const r = rng(seed);
+  const sites = [[0, 0]];
+  for (let k = 0; k < 6; k++) { const a = (30 + 60 * k) * Math.PI / 180; sites.push([ISD * Math.cos(a), ISD * Math.sin(a)]); }
+  const color = [0, 1, 2, 1, 2, 1, 2];
+  const pos = [], G = new Float64Array(UT * C), serving = new Int32Array(UT), edge = new Uint8Array(UT);
+  const cls = new Int32Array(UT), phase = new Int32Array(UT);
+  const active = new Uint8Array(UT), rateMul = new Float64Array(UT).fill(1);
+  for (let u = 0; u < U; u++) active[u] = 1;
+  serving.fill(-1);
+  for (let c = 0; c < C; c++) for (let i = 0; i < UPC; i++) {
+    const rr = Math.sqrt(0.005 + r() * 0.995) * RCELL, th = r() * 2 * Math.PI;
+    pos.push([sites[c][0] + rr * Math.cos(th), sites[c][1] + rr * Math.sin(th)]);
+  }
+  for (let u = 0; u < U; u++) {
+    let best = -1, bg = 0, tot = 0;
+    for (let c = 0; c < C; c++) {
+      const d = Math.max(Math.hypot(pos[u][0] - sites[c][0], pos[u][1] - sites[c][1]), 35);
+      const pl = 128.1 + 37.6 * Math.log10(d / 1000) + 8 * r.n();
+      const g = Math.pow(10, -pl / 10); G[u * C + c] = g; tot += g;
+      if (g > bg) { bg = g; best = c; }
+    }
+    serving[u] = best;
+    const geo = 10 * Math.log10(PRB * bg / (NOISE + PRB * (tot - bg)));
+    edge[u] = geo < 3 ? 1 : 0;
+    const x = r(); cls[u] = x < MIX[0] ? VOIP : x < MIX[0] + MIX[1] ? VIDEO : BE;
+    phase[u] = Math.floor(r() * 40);
+  }
+  const edgeRb = [];
+  for (let c = 0; c < C; c++) { const m = new Uint8Array(NRB); for (let b = color[c] * 8; b < color[c] * 8 + 8; b++) m[b] = 1; edgeRb.push(m); }
+  for (let u = U; u < UT; u++) pos.push([0, 0]);
+  const shadow = new Float64Array(UT * C);               // fixed shadowing for phone slots
+  for (let i = U * C; i < UT * C; i++) shadow[i] = 6 * r.n();
+  return { sites, pos, G, serving, edge, cls, phase, edgeRb, seed, active, rateMul, shadow,
+    down: new Uint8Array(C), jam: { on: false, x: 0, y: 0, g: new Float64Array(UT) } };
+}
+
+// A real phone joins: place it, give it a service, compute its radio links.
+const SVC = { voice: [VOIP, 1], video: [VIDEO, 2.7], download: [BE, 8], idle: [BE, 0] };
+function placePhone(w, u, x, y, svc) {
+  const [cl, mul] = SVC[svc] || SVC.idle;
+  w.pos[u] = [x, y]; w.cls[u] = cl; w.rateMul[u] = mul; w.active[u] = 1;
+  let best = 0, bg = 0, tot = 0;
+  for (let c = 0; c < C; c++) {
+    const d = Math.max(Math.hypot(x - w.sites[c][0], y - w.sites[c][1]), 35);
+    const g = Math.pow(10, -(128.1 + 37.6 * Math.log10(d / 1000) + w.shadow[u * C + c]) / 10);
+    w.G[u * C + c] = g; tot += g; if (g > bg && !w.down[c]) { bg = g; best = c; }
+  }
+  w.serving[u] = best; jamGain(w, u);
+  w.edge[u] = 10 * Math.log10(PRB * bg / (NOISE + PRB * (tot - bg))) < 3 ? 1 : 0;
+}
+// Re-attach every user to its strongest working cell (after a tower fails or recovers).
+function reattach(w) {
+  for (let u = 0; u < UT; u++) {
+    if (!w.active[u]) continue;
+    let best = -1, bg = -1;
+    for (let c = 0; c < C; c++) if (!w.down[c] && w.G[u * C + c] > bg) { bg = w.G[u * C + c]; best = c; }
+    w.serving[u] = best;
+  }
+}
+function jamGain(w, u) {
+  const d = Math.max(Math.hypot(w.pos[u][0] - w.jam.x, w.pos[u][1] - w.jam.y), 20);
+  w.jam.g[u] = Math.pow(10, -(128.1 + 37.6 * Math.log10(d / 1000)) / 10);
+}
+function removePhone(w, u) { w.active[u] = 0; w.serving[u] = -1; w.rateMul[u] = 0;
+}
+
+// ---------------------------------------------------------------- simulator (port of pulse/simulator.py)
+class Sim {
+  constructor(w, opt) {
+    this.w = w; this.opt = opt;
+    this.rT = rng(w.seed + 1000); this.rC = rng(w.seed + 2000); this.rE = rng(w.seed + 3000);
+    this.t = 0;
+    this.q = Array.from({ length: UT }, () => []);
+    this.buf = new Float64Array(UT); this.held = new Float64Array(UT); this.harq = []; this.rbar = new Float64Array(UT).fill(1);
+    this.olla = new Float64Array(UT);
+    this.hr = new Float64Array(UT * NSB); this.hi = new Float64Array(UT * NSB);
+    const r0 = rng(w.seed + 4000);
+    for (let i = 0; i < UT * NSB; i++) { this.hr[i] = r0.n() / Math.SQRT2; this.hi[i] = r0.n() / Math.SQRT2; }
+    this.hist = Array.from({ length: L }, () => new Float64Array(UT * NRB));
+    this.txh = Array.from({ length: L }, () => new Float64Array(C * NRB));
+    this.pmask = Array.from({ length: C }, () => new Float64Array(NRB).fill(1));
+    this.alloc = new Int32Array(C * NRB).fill(-1);
+    this.fail = new Uint8Array(C * NRB);
+    this.util = new Float64Array(C); this.asleep = new Uint8Array(C);
+    this.rows = Array.from({ length: C }, () => []);          // grid history per cell
+    // rolling stats (EWMA, ~2 s)
+    this.s = { bits: 0, tx: 0, err: 0, energy: 0, sleep: 0, vd: 0, vn: 0, vidA: 0, vidD: 0, voA: 0, voD: 0 };
+    this.uA = new Float64Array(UT); this.uD = new Float64Array(UT);
+    // per-user live readouts (shown on joined phones)
+    this.uT = new Float64Array(UT); this.uPrb = new Float64Array(UT); this.uNack = new Float64Array(UT);
+    this.uDel = new Float64Array(UT); this.uSinr = new Float64Array(UT); this.uCqi = new Int32Array(UT);
+    this.powerTrace = [];
+    this.prbHit = new Uint8Array(UT);
+  }
+  resetUser(u) {
+    this.q[u] = []; this.buf[u] = 0; this.held[u] = 0; this.rbar[u] = 1; this.olla[u] = 0;
+    this.uA[u] = 0; this.uD[u] = 0; this.uT[u] = 0; this.uPrb[u] = 0; this.uNack[u] = 0; this.uDel[u] = 0;
+  }
+  ew(k, v, a = 1 / 2000) { this.s[k] += a * (v - this.s[k]); }
+
+  arrivals(load, surge) {
+    const w = this.w, r = this.rT, t = this.t;
+    for (let u = 0; u < UT; u++) {
+      if (!w.active[u] || w.rateMul[u] === 0) continue;
+      const k = w.cls[u], mult = load * w.rateMul[u] * (surge && w.serving[u] === 0 ? 3 : 1);
+      let bits = 0;
+      if (k === VOIP) { if ((t + w.phase[u]) % 20 === 0) bits = 328; }
+      else if (k === VIDEO) { if ((t + w.phase[u]) % 40 === 0) bits = Math.exp(Math.log(18000 * mult) - 0.125 + 0.5 * r.n()); }
+      else { const lam = 250e3 * mult / 80e3 / 1000; if (r() < lam) bits = -Math.log(1 - r()) * 80e3; }
+      if (bits > 0) { this.q[u].push([bits, t]); this.buf[u] += bits; this.arrBits(u, bits); }
+    }
+  }
+  arrBits(u, b) { this.uA[u] += b; if (this.w.cls[u] === VIDEO) this.s.vidA += b / 2000; if (this.w.cls[u] === VOIP) this.s.voA += b / 2000; }
+
+  dropExpired() {
+    const w = this.w, t = this.t;
+    for (let u = 0; u < UT; u++) {
+      if (w.cls[u] === BE) continue;
+      const q = this.q[u];
+      while (q.length && t - q[0][1] > DEADLINE[w.cls[u]]) {
+        const b = q[0][0]; this.buf[u] -= b; this.uD[u] += b;
+        if (w.cls[u] === VIDEO) this.s.vidD += b / 2000; else this.s.voD += b / 2000;
+        q.shift();
+      }
+    }
+  }
+
+  updateSfr() {
+    const w = this.w;
+    for (let c = 0; c < C; c++) {
+      let tot = 0, ed = 0;
+      for (let u = 0; u < UT; u++) if (w.serving[u] === c) { const d = this.buf[u] + this.rbar[u]; tot += d; if (w.edge[u]) ed += d; }
+      const ratio = Math.min(6, Math.max(1, 1 + 5 * (ed / Math.max(tot, 1e-9)) / 0.5));
+      const lo = NRB / (8 * ratio + NRB - 8);
+      for (let b = 0; b < NRB; b++) this.pmask[c][b] = this.opt.sfr ? (w.edgeRb[c][b] ? ratio * lo : lo) : 1;
+    }
+  }
+
+  schedule(c, users, est, hol) {
+    const o = this.opt, w = this.w, out = new Int32Array(NRB).fill(-1);
+    const n = users.length; if (!n) return out;
+    const rem = new Float64Array(n); let any = 0;
+    for (let i = 0; i < n; i++) { rem[i] = Math.max(this.buf[users[i]] - this.held[users[i]], 0); any += rem[i]; }
+    if (any <= 0) return out;
+    const wgt = new Float64Array(n).fill(1);
+    if (o.sched === "pulse") {
+      let urgent = false, totBk = 0, cap = 0;
+      for (let i = 0; i < n; i++) {
+        const u = users[i], k = w.cls[u];
+        wgt[i] = [2, 1.5, 1][k] * (k === BE ? 1 : Math.exp(Math.min(4 * hol[u] / DEADLINE[k], 6)));
+        if (rem[i] > 0) { totBk += rem[i];
+          if (k !== BE && hol[u] >= 0.15 * DEADLINE[k]) urgent = true;
+          if (k === BE && hol[u] >= 40) urgent = true; }
+      }
+      if (o.eco) {
+        for (let b = 0; b < NRB; b++) { let s = 0; for (let i = 0; i < n; i++) s += est[users[i] * NRB + b]; cap += s / n; }
+        if (!urgent && totBk < 0.5 * cap) return out;                  // micro-sleep
+      }
+    }
+    for (let b = 0; b < NRB; b++) {
+      let best = -1, bm = -Infinity;
+      for (let i = 0; i < n; i++) {
+        if (rem[i] <= 0) continue;
+        const u = users[i], e = est[u * NRB + b]; if (e <= 0) continue;
+        let m = wgt[i] * e / Math.max(this.rbar[u], 1);
+        if (o.sched === "pulse" && o.sfr) {
+          const er = w.edgeRb[c][b];
+          m *= w.edge[u] ? (er ? 1.6 : 0.6) : (er ? 0.6 : 1);
+        }
+        if (m > bm) { bm = m; best = i; }
+      }
+      if (best < 0) continue;
+      out[b] = users[best]; rem[best] -= est[users[best] * NRB + b];
+    }
+    return out;
+  }
+
+  step(load, surge) {
+    const w = this.w, o = this.opt, t = this.t, r = this.rE;
+    this.arrivals(load, surge); this.dropExpired();
+    while (this.harq.length && this.harq[0][0] <= t) { const [, hu, hb] = this.harq.shift(); this.held[hu] = Math.max(this.held[hu] - hb, 0); }
+    if (t % 100 === 0) this.updateSfr();
+    const rep = this.hist[t >= DELAY ? (t - DELAY) % L : 0];
+    const est = new Float64Array(UT * NRB);
+    const useOlla = o.sched === "pulse" && o.olla;
+    for (let u = 0; u < UT; u++) for (let b = 0; b < NRB; b++) {
+      const raw = cqiOf(rep[u * NRB + b]);
+      let cq = useOlla ? cqiOf(rep[u * NRB + b] + this.olla[u]) : raw;
+      if (useOlla && raw > 0) cq = Math.max(cq, 1);
+      est[u * NRB + b] = EFF[cq] * RE;
+    }
+    const hol = new Float64Array(UT);
+    for (let u = 0; u < UT; u++) hol[u] = this.q[u].length ? t - this.q[u][0][1] : 0;
+    for (let c = 0; c < C; c++) {
+      const users = []; for (let u = 0; u < UT; u++) if (w.serving[u] === c) users.push(u);
+      if (w.down[c]) { this.alloc.fill(-1, c * NRB, (c + 1) * NRB); continue; }
+      this.alloc.set(this.schedule(c, users, est, hol), c * NRB);
+    }
+    // actual SINR with this TTI's activity
+    const tx = new Float64Array(C * NRB);
+    for (let c = 0; c < C; c++) for (let b = 0; b < NRB; b++) if (this.alloc[c * NRB + b] >= 0) tx[c * NRB + b] = this.pmask[c][b] * PRB;
+    if (t === 0) for (let i = 0; i < L; i++) this.txh[i].set(tx);
+    const txThen = this.txh[(t - DELAY + L * 10) % L];
+    const sinr = new Float64Array(UT * NRB), la = new Float64Array(UT * NRB);
+    const useIca = o.sched === "pulse" && o.ica;
+    for (let u = 0; u < UT; u++) {
+      const s = w.serving[u];
+      if (s < 0) { for (let b = 0; b < NRB; b++) { sinr[u * NRB + b] = -60; la[u * NRB + b] = -60; } continue; }
+      const gs = w.G[u * C + s];
+      for (let b = 0; b < NRB; b++) {
+        let iNow = 0, iThen = 0;
+        for (let c = 0; c < C; c++) if (c !== s) { const g = w.G[u * C + c]; iNow += g * tx[c * NRB + b]; iThen += g * txThen[c * NRB + b]; }
+        const ij = w.jam.on && b < JAM_RB ? JAMP * w.jam.g[u] : 0;   // external jammer: the controller cannot see it
+        const sbi = u * NSB + Math.floor(b / SB), fade = this.hr[sbi] ** 2 + this.hi[sbi] ** 2;
+        sinr[u * NRB + b] = 10 * Math.log10(this.pmask[s][b] * PRB * gs * fade / (NOISE + iNow + ij));
+        let l = rep[u * NRB + b];
+        if (useIca) l += 10 * Math.log10((NOISE + iThen) / (NOISE + iNow));
+        if (useOlla) l += this.olla[u];
+        la[u * NRB + b] = l;
+      }
+    }
+    if (t === 0) for (let i = 0; i < L; i++) this.hist[i].set(sinr);
+    this.hist[t % L].set(sinr); this.txh[t % L].set(tx);
+
+    // transmit
+    const served = new Float64Array(UT); this.fail.fill(0);
+    let pw = 0, live = 0;
+    for (let c = 0; c < C; c++) {
+      if (w.down[c]) { this.asleep[c] = 0; this.util[c] *= 0.98; const row = new Int16Array(NRB).fill(-3); this.rows[c].unshift(row); if (this.rows[c].length > 120) this.rows[c].pop(); continue; }
+      live++;
+      const seen = new Map(); let used = 0, pmSum = 0;
+      for (let b = 0; b < NRB; b++) { const u = this.alloc[c * NRB + b]; if (u >= 0) { used++; pmSum += this.pmask[c][b]; if (!seen.has(u)) seen.set(u, []); seen.get(u).push(b); } }
+      const p = used ? P0 + DP * PMAX * pmSum / NRB : (o.sched === "pulse" && o.eco ? PSLEEP : P0);
+      pw += p; this.asleep[c] = used ? 0 : 1;
+      this.util[c] += 0.02 * (used / NRB - this.util[c]);
+      this.ew("sleep", used ? 0 : 1);
+      for (const [u, rbs] of seen) {
+        let ml = 0, ms = 0; for (const b of rbs) { ml += la[u * NRB + b]; ms += sinr[u * NRB + b]; }
+        ml /= rbs.length; ms /= rbs.length;
+        const cq = Math.max(cqiOf(ml), 1);
+        const tb = Math.min(rbs.length * EFF[cq] * RE, Math.max(this.buf[u] - this.held[u], 0));
+        const ok = r() > blerOf(ms, cq);
+        this.uCqi[u] = cq; this.uPrb[u] += 0.02 * (rbs.length - this.uPrb[u]); this.prbHit[u] = 1;
+        this.uNack[u] += 0.02 * ((ok ? 0 : 1) - this.uNack[u]);
+        this.ew("tx", 1, 1 / 200); this.ew("err", ok ? 0 : 1, 1 / 200);
+        if (useOlla) this.olla[u] = Math.min(3, Math.max(-6, this.olla[u] + (ok ? 0.5 * 0.1 / 0.9 : -0.5)));
+        if (!ok) { for (const b of rbs) this.fail[c * NRB + b] = 1; this.held[u] += tb; this.harq.push([t + 8, u, tb]); continue; }
+        served[u] = tb; this.dequeue(u, tb);
+      }
+      // grid row
+      const row = new Int16Array(NRB);
+      for (let b = 0; b < NRB; b++) { const u = this.alloc[c * NRB + b]; row[b] = u < 0 ? (used ? -1 : -2) : (this.fail[c * NRB + b] ? 9 : w.cls[u]); }
+      this.rows[c].unshift(row); if (this.rows[c].length > 120) this.rows[c].pop();
+    }
+    let tot = 0;
+    for (let u = U; u < UT; u++) if (this.w.active[u]) {
+      if (!this.prbHit[u]) this.uPrb[u] *= 0.98;
+      this.prbHit[u] = 0;
+      this.uT[u] += 0.002 * (served[u] - this.uT[u]);
+      let m = 0; for (let b = 0; b < NRB; b++) m += sinr[u * NRB + b];
+      this.uSinr[u] += 0.05 * (m / NRB - this.uSinr[u]);
+    }
+    for (let u = 0; u < UT; u++) { tot += served[u]; this.rbar[u] += (served[u] - this.rbar[u]) / 100; }
+    this.ew("bits", tot); this.ew("energy", pw / Math.max(live, 1));
+    if (t % 20 === 0) { this.powerTrace.push(this.s.energy); if (this.powerTrace.length > 300) this.powerTrace.shift(); }
+    for (let i = 0; i < UT * NSB; i++) {
+      this.hr[i] = RHO * this.hr[i] + Math.sqrt(1 - RHO * RHO) * this.rC.n() / Math.SQRT2;
+      this.hi[i] = RHO * this.hi[i] + Math.sqrt(1 - RHO * RHO) * this.rC.n() / Math.SQRT2;
+    }
+    for (let u = 0; u < UT; u++) { this.uA[u] *= 0.9997; this.uD[u] *= 0.9997; }
+    this.s.vidA *= 0.9995; this.s.vidD *= 0.9995; this.s.voA *= 0.9995; this.s.voD *= 0.9995;
+    this.t++;
+  }
+  dequeue(u, bits) {
+    const q = this.q[u]; this.buf[u] = Math.max(this.buf[u] - bits, 0);
+    while (bits > 1e-9 && q.length) {
+      if (q[0][0] <= bits + 1e-9) {
+        bits -= q[0][0];
+        const d = this.t - q[0][1] + 1;
+        if (this.w.cls[u] === VOIP) this.s.vd += (d - this.s.vd) / 300;
+        if (u >= U) this.uDel[u] += (d - this.uDel[u]) / (this.w.cls[u] === BE ? 3 : 20);
+        q.shift();
+      } else { q[0][0] -= bits; bits = 0; }
+    }
+  }
+  kpis() {
+    const w = this.w; let rt = 0, ok = 0;
+    for (let u = 0; u < UT; u++) if (w.cls[u] !== BE && this.uA[u] > 0) {
+      rt++; if (this.uD[u] / this.uA[u] <= (w.cls[u] === VOIP ? 0.01 : 0.02)) ok++;
+    }
+    return {
+      tput: this.s.bits * 1000 / C / 1e6,
+      bler: this.s.tx > 0 ? 100 * this.s.err / this.s.tx : 0,
+      voip: this.s.vd,
+      vloss: this.s.vidA > 0 ? 100 * this.s.vidD / this.s.vidA : 0,
+      qos: rt ? 100 * ok / rt : 100,
+      power: this.s.energy,
+      sleep: 100 * this.s.sleep,
+      eff: this.s.energy > 0 ? this.s.bits * 1000 / C / this.s.energy / 1000 : 0,
+    };
+  }
+}
+
+// ---------------------------------------------------------------- UI
+const $ = id => document.getElementById(id);
+const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+let world, sims, running = true, cellSel = 0, surge = false;
+const phones = new Map();                                   // peer label -> {slot, nick, svc, x, y}
+const feats = { ica: true, olla: true, sfr: true, eco: true };
+
+function applyLab() {
+  UPC = +$("upc").value; U = C * UPC; UT = U + MAXP;
+  DELAY = +$("cqid").value; L = DELAY + 1;
+  const kmh = +$("spd").value, fd = kmh / 3.6 * 2e9 / 3e8; RHO = j0(2 * Math.PI * fd * 1e-3);
+  const v = +$("mixv").value / 100, d = +$("mixd").value / 100;
+  MIX = [v, Math.max(0, 1 - v - d)];
+}
+let seedNow = 7;
+function reset(seed) {
+  seedNow = seed;
+  applyLab();
+  world = makeWorld(seed);
+  [...phones.values()].forEach((ph, i) => ph.slot = U + i);
+  sims = [new Sim(world, { sched: "pf" }), new Sim(world, { sched: "pulse", ...feats })];
+  for (const ph of phones.values()) placePhone(world, ph.slot, ph.x, ph.y, ph.svc);
+  for (let i = 0; i < 400; i++) { sims[0].step(+$("load").value, surge); sims[1].step(+$("load").value, surge); }  // warm-up
+}
+
+function drawMap() {
+  const cv = $("map"), x = cv.getContext("2d"), W = cv.width, H = cv.height;
+  const s = sims[+$("mapsrc").value], sc = W / (ISD * 3.3), cx = W / 2, cy = H / 2;
+  x.clearRect(0, 0, W, H);
+  const P = (px, py) => [cx + px * sc, cy - py * sc];
+  const ink = css("--ink"), rule = css("--rule"), acc = s === sims[1] ? css("--accent") : css("--base");
+  const R = RCELL * sc;
+  world.sites.forEach((st, c) => {
+    const [X, Y] = P(st[0], st[1]);
+    x.beginPath();
+    for (let k = 0; k < 6; k++) { const a = Math.PI / 3 * k; x.lineTo(X + R * Math.cos(a), Y + R * Math.sin(a)); }
+    x.closePath();
+    if (world.down[c]) { x.fillStyle = css("--ink-3"); x.globalAlpha = 0.35; }
+    else if (s.asleep[c] && s.util[c] < 0.08) x.fillStyle = css("--sleep");
+    else { x.fillStyle = acc; x.globalAlpha = 0.08 + 0.55 * Math.min(1, s.util[c]); }
+    x.fill(); x.globalAlpha = 1;
+    x.lineWidth = c === cellSel ? 2.5 : 1; x.strokeStyle = c === cellSel ? ink : rule; x.stroke();
+    x.fillStyle = ink; x.beginPath(); x.moveTo(X, Y - 7); x.lineTo(X - 6, Y + 5); x.lineTo(X + 6, Y + 5); x.closePath(); x.fill();
+    x.font = "600 12px " + css("--mono"); x.fillStyle = css("--ink-2"); x.textAlign = "center";
+    x.fillText(world.down[c] ? `cell ${c}  DOWN` : `cell ${c}  ${Math.round(100 * s.util[c])}%`, X, Y + 20);
+  });
+  if (world.jam.on) {
+    const [JX, JY] = P(world.jam.x, world.jam.y);
+    x.strokeStyle = css("--bad"); x.lineWidth = 1.5;
+    for (const rr of [10, 22, 34]) { x.globalAlpha = 1 - rr / 45; x.beginPath(); x.arc(JX, JY, rr, 0, 7); x.stroke(); }
+    x.globalAlpha = 1; x.fillStyle = css("--bad"); x.beginPath(); x.arc(JX, JY, 6, 0, 7); x.fill();
+    x.font = "700 11px " + css("--mono"); x.textAlign = "center"; x.fillText("JAMMER", JX, JY - 40);
+  }
+  const cc = [css("--voip"), css("--video"), css("--be")];
+  for (let u = 0; u < U; u++) {
+    const [X, Y] = P(world.pos[u][0], world.pos[u][1]);
+    const busy = s.buf[u] > 0;
+    x.beginPath(); x.arc(X, Y, busy ? 4.5 : 3.2, 0, 2 * Math.PI);
+    x.fillStyle = cc[world.cls[u]]; x.globalAlpha = busy ? 1 : 0.45; x.fill(); x.globalAlpha = 1;
+    if (world.edge[u]) { x.lineWidth = 1.3; x.strokeStyle = css("--ink-2"); x.beginPath(); x.arc(X, Y, 7, 0, 2 * Math.PI); x.stroke(); }
+  }
+  for (const [peer, ph] of phones) {                       // joined real phones
+    const u = ph.slot, [X, Y] = P(world.pos[u][0], world.pos[u][1]);
+    x.beginPath(); x.moveTo(X, Y - 10); x.lineTo(X + 9, Y); x.lineTo(X, Y + 10); x.lineTo(X - 9, Y); x.closePath();
+    x.fillStyle = ph.svc === "idle" ? css("--ink-3") : cc[world.cls[u]]; x.fill();
+    x.lineWidth = 2.2; x.strokeStyle = ink; x.stroke();
+    x.font = "600 12px " + css("--body"); x.fillStyle = ink; x.textAlign = "left";
+    x.fillText(ph.nick, X + 12, Y + 4);
+  }
+}
+
+function drawGrid(i) {
+  const cv = $("g" + i), x = cv.getContext("2d"), W = cv.width, H = cv.height;
+  const top = i === 1 ? 6 : 0, cw = W / NRB, rh = (H - top) / 120;
+  const col = { "-3": css("--ink-3"), "-1": css("--idle"), "-2": css("--sleep"), 0: css("--voip"), 1: css("--video"), 2: css("--be"), 9: css("--err") };
+  x.fillStyle = css("--panel"); x.fillRect(0, 0, W, H);
+  const rows = sims[i].rows[cellSel];
+  for (let r = 0; r < rows.length; r++) for (let b = 0; b < NRB; b++) {
+    x.fillStyle = col[rows[r][b]]; x.fillRect(b * cw, top + r * rh, cw - 1, Math.max(rh, 1));
+  }
+  if (i === 1 && feats.sfr) {
+    x.fillStyle = css("--accent");
+    for (let b = 0; b < NRB; b++) if (world.edgeRb[cellSel][b]) x.fillRect(b * cw, 0, cw - 1, 4);
+  }
+}
+
+function drawSpark() {
+  const cv = $("spark"), x = cv.getContext("2d"), W = cv.width, H = cv.height, pad = 30;
+  x.clearRect(0, 0, W, H);
+  const lo = 60, hi = 240;
+  x.strokeStyle = css("--rule"); x.fillStyle = css("--ink-3"); x.font = "11px " + css("--mono"); x.lineWidth = 1;
+  for (const v of [75, 130, 180, 230]) {
+    const y = H - 14 - (v - lo) / (hi - lo) * (H - 24);
+    x.beginPath(); x.moveTo(pad, y); x.lineTo(W, y); x.stroke(); x.fillText(v, 2, y + 4);
+  }
+  [[sims[0], css("--base")], [sims[1], css("--accent")]].forEach(([s, c]) => {
+    const tr = s.powerTrace; if (tr.length < 2) return;
+    x.strokeStyle = c; x.lineWidth = 2; x.beginPath();
+    tr.forEach((v, k) => { const X = pad + (W - pad) * k / 299, Y = H - 14 - (v - lo) / (hi - lo) * (H - 24); k ? x.lineTo(X, Y) : x.moveTo(X, Y); });
+    x.stroke();
+    const k = tr.length - 1, X = pad + (W - pad) * k / 299, Y = H - 14 - (tr[k] - lo) / (hi - lo) * (H - 24);
+    x.fillStyle = c; x.beginPath(); x.arc(X, Y, 4, 0, 7); x.fill();
+  });
+}
+
+const ROWS = [
+  ["tput", "Cell throughput", "Mbps", 2, +1],
+  ["bler", "Block error rate", "%", 1, -1],
+  ["voip", "VoIP delay (budget 100 ms)", "ms", 1, 0],
+  ["vloss", "Video packet loss", "%", 2, -1],
+  ["qos", "Real-time users meeting QoS", "%", 0, +1],
+  ["power", "Power per cell", "W", 0, -1],
+  ["sleep", "TTIs in micro-sleep", "%", 0, +1],
+  ["eff", "Energy efficiency", "kbit/J", 1, +1],
+];
+function drawKpi() {
+  const a = sims[0].kpis(), b = sims[1].kpis();
+  $("kpi").innerHTML = ROWS.map(([k, n, unit, d, dir]) => {
+    const va = a[k], vb = b[k];
+    let cls = "flat", txt = "–";
+    const diff = vb - va, rel = Math.abs(va) > 1e-6 ? 100 * diff / Math.abs(va) : 0;
+    const absMode = unit === "%";
+    const mag = absMode ? Math.abs(diff) : Math.abs(rel);
+    if (mag >= (absMode ? 0.3 : 1.5)) {
+      txt = (diff > 0 ? "+" : "−") + (absMode ? Math.abs(diff).toFixed(1) + " pt" : Math.abs(rel).toFixed(0) + "%");
+      cls = dir === 0 ? "flat" : (diff * dir > 0 ? "good" : "bad");
+    }
+    return `<tr><td>${n}</td><td class="num">${va.toFixed(d)} <span class="unit">${unit}</span></td>` +
+      `<td class="num">${vb.toFixed(d)} <span class="unit">${unit}</span></td><td><span class="delta ${cls}">${txt}</span></td></tr>`;
+  }).join("");
+}
+
+let frame = 0;
+function loop() {
+  if (running) {
+    const n = +$("speed").value, load = +$("load").value;
+    for (let i = 0; i < n; i++) { sims[0].step(load, surge); sims[1].step(load, surge); }
+    $("clock").textContent = (sims[0].t / 1000).toFixed(3) + " s";
+  }
+  drawGrid(0); drawGrid(1); drawMap();
+  if (frame++ % 10 === 0) { drawKpi(); drawSpark(); }
+  requestAnimationFrame(loop);
+}
+
+$("play").onclick = () => { running = !running; $("play").textContent = running ? "Pause" : "Play"; };
+$("reset").onclick = () => reset(Math.floor(Math.random() * 1e6));
+$("load").oninput = e => { $("loadv").textContent = (+e.target.value).toFixed(1) + "×"; };
+function setSurge(on) { surge = !!on; $("surge").setAttribute("aria-pressed", surge); $("surge").textContent = surge ? "End surge" : "Stadium surge in cell 0"; if (world) renderLabState(); }
+$("surge").onclick = () => setSurge(!surge);
+document.querySelectorAll(".chip").forEach(ch => ch.onclick = () => {
+  const f = ch.dataset.f; feats[f] = !feats[f]; ch.setAttribute("aria-pressed", feats[f]);
+  sims[1].opt[f] = feats[f]; if (f === "sfr") sims[1].updateSfr();
+});
+$("map").onclick = e => {
+  const cv = $("map"), r = cv.getBoundingClientRect();
+  const px = (e.clientX - r.left) * cv.width / r.width, py = (e.clientY - r.top) * cv.height / r.height;
+  const sc = cv.width / (ISD * 3.3);
+  let best = 0, bd = Infinity;
+  world.sites.forEach((s, c) => { const d = Math.hypot(cv.width / 2 + s[0] * sc - px, cv.height / 2 - s[1] * sc - py); if (d < bd) { bd = d; best = c; } });
+  const tool = $("tool").value;
+  if (tool === "fail") { toggleCell(best); return; }
+  if (tool === "jam") { setJammer(true, (px - cv.width / 2) / sc, -(py - cv.height / 2) / sc); return; }
+  cellSel = best; $("cellname").textContent = best === 0 ? "cell 0 (centre)" : "cell " + best;
+};
+function toggleCell(c, force) {
+  const down = force === undefined ? !world.down[c] : !!force;
+  if (down && [...world.down].filter(Boolean).length >= C - 1 && !world.down[c]) return false;   // keep one cell alive
+  world.down[c] = down ? 1 : 0; reattach(world); renderLabState(); return true;
+}
+function setJammer(on, x, y) {
+  world.jam.on = !!on;
+  if (x !== undefined) { world.jam.x = x; world.jam.y = y; for (let u = 0; u < UT; u++) jamGain(world, u); }
+  renderLabState();
+}
+function renderLabState() {
+  const downs = [...world.down].map((d, c) => d ? c : -1).filter(c => c >= 0);
+  $("labstate").textContent = (downs.length ? `Failed: cell ${downs.join(", ")}` : "All cells up") +
+    (world.jam.on ? ` · Jammer on (${Math.round(world.jam.x)} m, ${Math.round(world.jam.y)} m)` : " · No jammer") +
+    (surge ? " · Stadium surge in cell 0" : "");
+  $("jamoff").disabled = !world.jam.on;
+}
+if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) $("speed").value = "2";
+
+// ---------------------------------------------------------------- experiment lab
+const mixSync = () => {
+  let v = +$("mixv").value, d = +$("mixd").value;
+  if (v + d > 100) { d = 100 - v; $("mixd").value = d; }
+  $("mixvv").textContent = v + "%"; $("mixdv").textContent = d + "%"; $("mixvid").textContent = (100 - v - d) + "%";
+};
+$("upc").oninput = e => $("upcv").textContent = e.target.value;
+$("cqid").oninput = e => $("cqidv").textContent = e.target.value + " ms";
+$("mixv").oninput = mixSync; $("mixd").oninput = mixSync;
+$("rebuild").onclick = () => { reset(seedNow); renderLabState(); };
+$("jamoff").onclick = () => setJammer(false);
+$("restore").onclick = () => { world.down.fill(0); reattach(world); renderLabState(); };
+
+function scenarioLabel() {
+  const f = Object.entries(feats).filter(([, v]) => !v).map(([k]) => k.toUpperCase());
+  const downs = [...world.down].map((d, c) => d ? c : -1).filter(c => c >= 0);
+  const parts = [`${UPC} users/cell`, `${$("spd").value} km/h`];
+  if (downs.length) parts.push(`cell ${downs.join(",")} down`);
+  if (world.jam.on) parts.push("jammer");
+  if (surge) parts.push("surge");
+  if (DELAY !== 4) parts.push(`CQI delay ${DELAY} ms`);
+  if (f.length) parts.push("PULSE without " + f.join("/"));
+  return parts.join(" · ");
+}
+const logRows = [];
+function recordResult(label) {
+  const a = sims[0].kpis(), b = sims[1].kpis();
+  logRows.unshift({ label: label || scenarioLabel(), load: +$("load").value, t: sims[0].t, a, b });
+  renderLog();
+}
+function renderLog() {
+  if (!logRows.length) return;
+  const pair = (x, y, d, u) => `${x.toFixed(d)} / <b>${y.toFixed(d)}</b> ${u}`;
+  $("log").innerHTML = logRows.map(r => `<tr><td>${esc(r.label)}</td><td class="num">${r.load.toFixed(1)}×</td>` +
+    `<td class="num">${pair(r.a.tput, r.b.tput, 2, "Mbps")}</td><td class="num">${pair(r.a.bler, r.b.bler, 1, "%")}</td>` +
+    `<td class="num">${pair(r.a.vloss, r.b.vloss, 1, "%")}</td><td class="num">${pair(r.a.qos, r.b.qos, 0, "%")}</td>` +
+    `<td class="num">${pair(r.a.power, r.b.power, 0, "W")}</td></tr>`).join("");
+}
+$("record").onclick = () => recordResult();
+cuse("downloads").then(dl => {
+  if (!dl && IN_CLAUDE) return;
+  $("savecsv").hidden = false;
+  $("savecsv").onclick = () => {
+    if (!logRows.length) return;
+    const keys = ["tput", "bler", "voip", "vloss", "qos", "power", "sleep", "eff"];
+    const head = ["scenario", "load", "sim_time_s", ...keys.flatMap(k => [k + "_pf", k + "_pulse"])];
+    const q = v => `"${String(v).replace(/"/g, '""')}"`;
+    const lines = [head.join(","), ...logRows.map(r => [q(r.label), r.load, (r.t / 1000).toFixed(1),
+      ...keys.flatMap(k => [r.a[k].toFixed(3), r.b[k].toFixed(3)])].join(","))];
+    if (dl) { dl.save({ filename: "pulse-lte-experiments.csv", data: lines.join("\n") }).catch(() => {}); return; }
+    const a = document.createElement("a");                      // laptop mode: plain browser download
+    a.href = URL.createObjectURL(new Blob([lines.join("\n")], { type: "text/csv" }));
+    a.download = "pulse-lte-experiments.csv"; document.body.append(a); a.click(); a.remove();
+  };
+});
+
+// ---------------------------------------------------------------- AI network operator
+const sleepFrame = () => new Promise(r => setTimeout(r, 0));
+async function runFor(seconds, signal) {
+  const n = Math.round(Math.min(Math.max(seconds, 0.5), 6) * 1000), load = () => +$("load").value;
+  // reset the rolling windows so the answer reflects this scenario only
+  for (let i = 0; i < n; i += 100) {
+    if (signal && signal.aborted) break;
+    for (let k = 0; k < 100; k++) { sims[0].step(load(), surge); sims[1].step(load(), surge); }
+    $("clock").textContent = (sims[0].t / 1000).toFixed(3) + " s";
+    await sleepFrame();
+  }
+}
+const kpiOut = () => {
+  const r = k => Object.fromEntries(Object.entries(k).map(([n, v]) => [n, Math.round(v * 100) / 100]));
+  return { prop_fair: r(sims[0].kpis()), pulse: r(sims[1].kpis()), scenario: scenarioLabel(), load: +$("load").value,
+    cell_utilisation_pulse: [...sims[1].util].map(v => Math.round(v * 100)) };
+};
+const TOOLS = [
+  { name: "get_state", description: "Current scenario and live KPIs for both networks (Proportional Fair vs PULSE): tput Mbps/cell, bler %, voip delay ms, vloss = video loss %, qos = % real-time users meeting target, power W/cell, sleep % of TTIs, eff kbit/J.",
+    execute: () => kpiOut() },
+  { name: "set_load", description: "Set offered traffic load, 0.2 to 1.6 (1.0 = nominal, near capacity).",
+    inputSchema: { type: "object", properties: { load: { type: "number" } }, required: ["load"] },
+    execute: i => { const v = Math.min(1.6, Math.max(0.2, Math.round(Number(i.load) * 10) / 10)); if (!Number.isFinite(v)) throw new Error("load must be a number"); $("load").value = v; $("loadv").textContent = v.toFixed(1) + "×"; return `load ${v}`; } },
+  { name: "set_cell", description: "Fail (down=true) or restore (down=false) a tower, cell 0-6. Cell 0 is the centre. Users re-attach to the next strongest cell.",
+    inputSchema: { type: "object", properties: { cell: { type: "integer" }, down: { type: "boolean" } }, required: ["cell", "down"] },
+    execute: i => { const c = Math.round(Number(i.cell)); if (!(c >= 0 && c < C)) throw new Error("cell must be 0-6"); if (!toggleCell(c, !!i.down)) throw new Error("at least one cell must stay up"); return `cell ${c} ${i.down ? "down" : "up"}`; } },
+  { name: "set_jammer", description: "Turn an external jammer on or off. near_cell 0-6 places it 150 m from that tower. It hits PRBs 0-11 and is invisible to the controller.",
+    inputSchema: { type: "object", properties: { on: { type: "boolean" }, near_cell: { type: "integer" } }, required: ["on"] },
+    execute: i => { if (!i.on) { setJammer(false); return "jammer off"; } const c = Math.min(6, Math.max(0, Math.round(Number(i.near_cell ?? 0)))); const st = world.sites[c]; setJammer(true, st[0] + 150, st[1] + 60); return `jammer near cell ${c}`; } },
+  { name: "set_surge", description: "Stadium surge: triples traffic of every user in cell 0 (on=true) or ends it.",
+    inputSchema: { type: "object", properties: { on: { type: "boolean" } }, required: ["on"] },
+    execute: i => { setSurge(!!i.on); return `surge ${i.on ? "on" : "off"}`; } },
+  { name: "set_feature", description: "Turn one PULSE feature on/off: ica (interference-coordinated link adaptation), olla (outer-loop link adaptation), sfr (adaptive soft frequency reuse), eco (slack-aware sleep).",
+    inputSchema: { type: "object", properties: { feature: { type: "string", enum: ["ica", "olla", "sfr", "eco"] }, on: { type: "boolean" } }, required: ["feature", "on"] },
+    execute: i => { const f = String(i.feature); if (!(f in feats)) throw new Error("unknown feature"); feats[f] = !!i.on; sims[1].opt[f] = feats[f]; document.querySelector(`.chip[data-f="${f}"]`).setAttribute("aria-pressed", feats[f]); if (f === "sfr") sims[1].updateSfr(); return `${f} ${i.on ? "on" : "off"}`; } },
+  { name: "run", description: "Advance both networks by 1-6 simulated seconds under the current settings, record the result in the experiment log, and return KPIs. Run at least 3 s after any change before judging; KPIs are rolling 2-second averages.",
+    inputSchema: { type: "object", properties: { seconds: { type: "number" }, label: { type: "string" } }, required: ["seconds"] },
+    execute: async (i, ctx) => { await runFor(Number(i.seconds) || 3, ctx.signal); if (ctx.signal.aborted) throw new Error("stopped"); recordResult(i.label ? clean(i.label, 60) + " (AI)" : scenarioLabel() + " (AI)"); return kpiOut(); } },
+];
+const BRIEF = `You are the operator of a live LTE network simulator in a university Wireless & Mobile Communications project.
+Two identical 7-cell LTE downlink networks (5 MHz, 25 PRBs, 1 ms TTI, same users, traffic and fading) run side by side:
+- "prop_fair": Proportional Fair scheduler with plain delayed CQI.
+- "pulse": the student's PULSE resource manager = deadline/priority-aware scheduler + ICA (corrects stale CQI for the interference neighbours will cause this TTI, using the central view of all cells' allocations) + OLLA (per-user offset targeting 10% BLER) + adaptive soft frequency reuse for edge users + slack-aware cell sleep (holds packets with spare delay budget so cells can sleep).
+Traffic: VoIP (100 ms budget), video (300 ms budget), best-effort downloads.
+Answer the viewer's question by running a small, fair experiment with the tools: set up conditions, run 3-4 s, change ONE thing, run again, compare. Restore anything you changed that the viewer did not ask to keep (towers, jammer, surge, features) at the end, unless the question is about leaving it that way.
+Then answer in plain language for a professor, at most 170 words, quoting the measured numbers for both networks, explaining WHY using LTE concepts (CQI, MCS, BLER, HARQ, interference, PRBs). Be honest when PULSE is worse (e.g. it sacrifices best-effort throughput under overload). No headings, no bullet lists longer than 4 items.
+Write nothing until all tool calls are done; your only text is the final answer.`;
+let aiCtl = null;
+cuse("sample").then(sample => {
+  if (!sample) { $("aipanel").hidden = true; return; }
+  document.querySelectorAll("#sugg button").forEach(b => b.onclick = () => { $("ask").value = b.textContent; $("ask").focus(); });
+  $("stopbtn").onclick = () => aiCtl && aiCtl.abort();
+  $("askbtn").onclick = async () => {
+    const q = $("ask").value.trim(); if (!q) { $("ask").focus(); return; }
+    aiCtl = new AbortController();
+    $("askbtn").disabled = true; $("stopbtn").hidden = false; $("trace").innerHTML = ""; $("answer").textContent = ""; $("ainote").textContent = "Thinking…";
+    const wasRunning = running; running = false;                  // the operator drives the clock
+    const traced = TOOLS.map(t => ({ ...t, execute: async (i, ctx) => {
+      const li = document.createElement("li"); li.textContent = t.name.replace("_", " ") + " " + JSON.stringify(i || {}).replace(/[{}"]/g, "");
+      $("trace").append(li);
+      return t.execute(i || {}, ctx);
+    } }));
+    try {
+      const { text, truncated } = await sample(`${BRIEF}
+
+Current state:
+${JSON.stringify(kpiOut())}
+
+Viewer's question: ${q}`, {
+        tools: traced, signal: aiCtl.signal, cache: false,
+        onText: ({ text }) => { $("answer").textContent = text; $("ainote").textContent = ""; },
+      });
+      $("answer").textContent = text.trim();
+      $("ainote").textContent = truncated ? "The answer was cut short. Ask a narrower question." : "Each run is in the experiment log.";
+    } catch (e) {
+      if (e.text) $("answer").textContent = e.text;
+      $("ainote").textContent = e.code === "cancelled" ? "Stopped." : e.code === "not_granted" ? "AI operator needs permission to use your Claude account." :
+        e.code === "rate_limited" ? "Too many questions at once. Wait a moment, then ask again." : "The AI operator couldn't finish. Try a simpler question.";
+      if (e.code === "not_granted") $("askbtn").disabled = true;
+    } finally {
+      if ($("ainote").textContent !== "AI operator needs permission to use your Claude account.") $("askbtn").disabled = false;
+      $("stopbtn").hidden = true; running = wasRunning;
+    }
+  };
+});
+
+// ---------------------------------------------------------------- live room: real phones join
+// Same calls as Claude's room capability, backed by serve.py on the laptop (HTTP polling).
+function localRoom() {
+  return fetch("/api/info", { cache: "no-store" }).then(r => r.ok ? r.json() : null).then(info => {
+    if (!info || !info.pulse) return null;
+    const me = Math.random().toString(36).slice(2, 12);
+    const mine = {}, peerL = [], topicL = {}, connL = [];
+    let peers = [], ok = false, lastSeq = -1;
+    const setConn = v => { if (v !== ok) { ok = v; connL.forEach(f => f(v)); } };
+    const post = (url, body) => fetch(url, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+    async function tick() {
+      try {
+        const d = await (await post("/api/sync", { id: me, presence: mine, since: lastSeq })).json();
+        setConn(true);
+        const prev = new Map(peers.map(p => [p.peer, p]));
+        peers = d.peers.map(p => ({ peer: p.id, presence: p.presence || {}, sameTab: p.id === me, isMe: p.id === me, kind: "viewer", guest: false, by: null, updatedAt: Date.now() }));
+        const joined = peers.filter(p => !prev.has(p.peer)), left = [...prev.values()].filter(p => !peers.some(q => q.peer === p.peer));
+        peerL.forEach(f => f({ peers, joined, left, updated: peers }));
+        for (const m of d.messages) {
+          lastSeq = Math.max(lastSeq, m.seq);
+          (topicL[m.topic] || []).forEach(f => f({ topic: m.topic, data: m.data, peer: m.from, sameTab: m.from === me, isMe: m.from === me, kind: "viewer", guest: false, by: null }));
+        }
+      } catch (e) { setConn(false); }
+    }
+    setInterval(tick, 700); tick();
+    return {
+      local: true, info,
+      presence: patch => { for (const [k, v] of Object.entries(patch)) { if (v === null) delete mine[k]; else mine[k] = v; } return Promise.resolve(); },
+      onPeers: f => { peerL.push(f); return () => {}; },
+      on: (t, f) => { (topicL[t] = topicL[t] || []).push(f); return () => {}; },
+      emit: (t, data) => post("/api/emit", { id: me, topic: t, data }).then(() => {}),
+      connected: () => ok,
+      onConnection: f => { connL.push(f); setTimeout(() => f(ok), 0); return () => {}; },
+      peers: () => peers,
+    };
+  }).catch(() => null);
+}
+const getRoom = () => cuse("room").then(r => r || (IN_CLAUDE ? null : localRoom()));
+let JOIN_URL = $("joinurl").textContent;
+const MOD = c => c >= 10 ? "64QAM" : c >= 7 ? "16QAM" : c >= 1 ? "QPSK" : "–";
+const SVC_NAME = { voice: "Voice call", video: "HD video", download: "Download", idle: "Idle" };
+const clean = (v, n) => String(v ?? "").replace(/[^\p{L}\p{N} ._-]/gu, "").slice(0, n);
+const esc = v => String(v).replace(/[&<>"]/g, ch => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[ch]);
+const num = (v, lo, hi, d) => { const n = Number(v); return Number.isFinite(n) ? Math.min(hi, Math.max(lo, n)) : d; };
+
+function bootHost() {
+  const makeQR = url => {
+    $("qr").innerHTML = "";
+    try { new QRCode($("qr"), { text: url, width: 148, height: 148, colorDark: "#111111", colorLight: "#ffffff" }); }
+    catch (e) { $("qr").hidden = true; }
+  };
+  if (IN_CLAUDE) makeQR(JOIN_URL);
+  else {
+    $("joinhelp").textContent = "Connect phones to the same Wi-Fi or hotspot as this laptop, then scan. No account or app needed. The phone becomes a real user in both networks: pick a call, video or download, tap where you are standing, and see your own signal, modulation and speed under Prop. Fair and PULSE.";
+    fetch("/api/info", { cache: "no-store" }).then(r => r.json()).then(info => {
+      JOIN_URL = info.join_url; $("joinurl").textContent = JOIN_URL; makeQR(JOIN_URL);
+    }).catch(() => { $("joinurl").textContent = "Start this page with serve.py so phones can join"; $("qr").hidden = true; });
+  }
+  $("copy").onclick = () => {
+    const done = () => { $("copy").textContent = "Copied"; setTimeout(() => $("copy").textContent = "Copy link", 1500); };
+    const sel = () => { const r = document.createRange(); r.selectNodeContents($("joinurl")); const s = getSelection(); s.removeAllRanges(); s.addRange(r); };
+    try { navigator.clipboard.writeText(JOIN_URL).then(done, sel); } catch (e) { sel(); }
+  };
+  reset(7);
+  renderLabState();
+  loop();
+  const since = Date.now();
+  getRoom().then(room => {
+    const stat = $("roomstat");
+    if (!room) { stat.textContent = "Phones can't join from this view"; stat.className = "pill off"; return; }
+    room.presence({ role: "host", since }).catch(() => {});
+    room.onConnection(on => { stat.textContent = on ? "Room open · phones can join" : "Reconnecting…"; stat.className = "pill" + (on ? " on" : ""); },
+      () => { stat.textContent = "Phones can't join from this view"; stat.className = "pill off"; });
+    const sync = peers => {
+      const seen = new Set();
+      for (const p of peers) {
+        const pr = p.presence || {};
+        if (p.sameTab || pr.role !== "ue") continue;
+        seen.add(p.peer);
+        const nick = clean(pr.nick, 14) || "Phone";
+        const svc = SVC[pr.svc] ? pr.svc : "idle";
+        const x = num(pr.x, -1000, 1000, 0), y = num(pr.y, -1000, 1000, 0);
+        let ph = phones.get(p.peer);
+        if (!ph) {
+          const used = new Set([...phones.values()].map(v => v.slot));
+          let slot = -1; for (let u = U; u < UT; u++) if (!used.has(u)) { slot = u; break; }
+          if (slot < 0) continue;                               // network full (12 phones)
+          ph = { slot, svc: null }; phones.set(p.peer, ph);
+        }
+        const svcChanged = ph.svc !== svc;
+        Object.assign(ph, { nick, svc, x, y });
+        placePhone(world, ph.slot, x, y, svc);
+        if (svcChanged) { sims[0].resetUser(ph.slot); sims[1].resetUser(ph.slot); }
+      }
+      for (const [peer, ph] of phones) if (!seen.has(peer)) {
+        removePhone(world, ph.slot); sims[0].resetUser(ph.slot); sims[1].resetUser(ph.slot); phones.delete(peer);
+      }
+      renderPhoneTable();
+    };
+    room.onPeers(ch => sync(ch.peers));
+    // only the longest-running control-room screen reports, so phones hear one voice
+    setInterval(() => {
+      if (!phones.size || !room.connected()) return;
+      const hosts = room.peers().filter(p => p.presence && p.presence.role === "host");
+      const leader = hosts.reduce((a, p) => (num(p.presence.since, 0, 1e15, 1e15) < num(a.presence.since, 0, 1e15, 1e15) ? p : a), hosts[0]);
+      if (leader && !leader.sameTab) return;
+      const ues = {};
+      for (const [peer, ph] of phones) {
+        const u = ph.slot, a = sims[0], b = sims[1], r1 = v => Math.round(v * 10) / 10;
+        ues[peer] = { c: world.serving[u], e: world.edge[u], s: r1(b.uSinr[u]),
+          q: [a.uCqi[u], b.uCqi[u]], p: [r1(a.uPrb[u]), r1(b.uPrb[u])],
+          t: [Math.round(a.uT[u]), Math.round(b.uT[u])], d: [Math.round(a.uDel[u]), Math.round(b.uDel[u])],
+          l: [r1(a.uA[u] > 0 ? 100 * a.uD[u] / a.uA[u] : 0), r1(b.uA[u] > 0 ? 100 * b.uD[u] / b.uA[u] : 0)],
+          n: [Math.round(100 * a.uNack[u]), Math.round(100 * b.uNack[u])] };
+      }
+      room.emit("ue", { since, ues }).catch(() => {});
+      renderPhoneTable();
+    }, 600);
+  });
+}
+
+function renderPhoneTable() {
+  const tb = $("phones");
+  if (!phones.size) { tb.innerHTML = '<tr><td colspan="6" class="empty">No phones joined yet.</td></tr>'; return; }
+  tb.innerHTML = [...phones.values()].map(ph => {
+    const u = ph.slot;
+    return `<tr><td>${esc(ph.nick)}</td><td>${SVC_NAME[ph.svc]}</td><td class="num">${world.serving[u]}${world.edge[u] ? " · edge" : ""}</td>` +
+      `<td class="num">${sims[1].uSinr[u].toFixed(1)} dB</td><td class="num">${Math.round(sims[0].uT[u])} kbps</td><td class="num">${Math.round(sims[1].uT[u])} kbps</td></tr>`;
+  }).join("");
+}
+
+function bootPhone() {
+  document.querySelector(".wrap").hidden = true;
+  $("phoneview").hidden = false;
+  const geo = makeWorld(7);                                   // sites only, for drawing
+  const me = { nick: "", svc: "video", x: 120 + Math.random() * 60, y: -60 + Math.random() * 60 };
+  try { me.nick = localStorage.getItem("pulse-nick") || ""; } catch (e) {}
+  if (!me.nick) me.nick = "Phone " + Math.floor(10 + Math.random() * 90);
+  $("nick").value = me.nick;
+  let room = null, myPeer = null, last = null, lastAt = 0, others = [];
+  const push = () => room && room.presence({ role: "ue", nick: me.nick, svc: me.svc, x: Math.round(me.x), y: Math.round(me.y) }).catch(() => {});
+
+  const draw = () => {
+    const cv = $("pmap"), x = cv.getContext("2d"), W = cv.width, H = cv.height, sc = W / (ISD * 3.3);
+    const P = (px, py) => [W / 2 + px * sc, H / 2 - py * sc], R = RCELL * sc;
+    x.clearRect(0, 0, W, H);
+    geo.sites.forEach((st, c) => {
+      const [X, Y] = P(st[0], st[1]);
+      x.beginPath(); for (let k = 0; k < 6; k++) { const a = Math.PI / 3 * k; x.lineTo(X + R * Math.cos(a), Y + R * Math.sin(a)); } x.closePath();
+      x.fillStyle = css("--accent"); x.globalAlpha = last && last.c === c ? 0.22 : 0.06; x.fill(); x.globalAlpha = 1;
+      x.strokeStyle = css("--rule"); x.lineWidth = 1; x.stroke();
+      x.fillStyle = css("--ink"); x.beginPath(); x.moveTo(X, Y - 7); x.lineTo(X - 6, Y + 5); x.lineTo(X + 6, Y + 5); x.closePath(); x.fill();
+      x.font = "600 11px " + css("--mono"); x.fillStyle = css("--ink-3"); x.textAlign = "center"; x.fillText("cell " + c, X, Y + 19);
+    });
+    for (const o of others) { const [X, Y] = P(o.x, o.y); x.fillStyle = css("--ink-3"); x.beginPath(); x.arc(X, Y, 4, 0, 7); x.fill(); }
+    const [X, Y] = P(me.x, me.y), col = { voice: css("--voip"), video: css("--video"), download: css("--be"), idle: css("--ink-3") }[me.svc];
+    if (last) { const s = geo.sites[last.c], [SX, SY] = P(s[0], s[1]); x.setLineDash([4, 4]); x.strokeStyle = css("--ink-2"); x.beginPath(); x.moveTo(SX, SY); x.lineTo(X, Y); x.stroke(); x.setLineDash([]); }
+    x.beginPath(); x.moveTo(X, Y - 12); x.lineTo(X + 11, Y); x.lineTo(X, Y + 12); x.lineTo(X - 11, Y); x.closePath();
+    x.fillStyle = col; x.fill(); x.lineWidth = 2.5; x.strokeStyle = css("--ink"); x.stroke();
+    x.font = "600 13px " + css("--body"); x.fillStyle = css("--ink"); x.textAlign = "left"; x.fillText("You", X + 14, Y + 5);
+  };
+
+  const render = () => {
+    const stat = $("pstat"), live = last && Date.now() - lastAt < 5000;
+    if (!room) { stat.textContent = "Can't join live from this view"; stat.className = "pill off"; }
+    else if (!live) { stat.textContent = "Joined · waiting for the control-room screen"; stat.className = "pill"; }
+    else { stat.textContent = "Live in the network"; stat.className = "pill on"; }
+    if (!live) { draw(); return; }
+    const d = last;
+    $("pcell").textContent = `Served by cell ${d.c}${d.e ? " · you are a cell-edge user" : ""}`;
+    $("psinr").textContent = d.s.toFixed(1) + " dB";
+    $("pcqi").textContent = d.q[1] || "–";
+    $("pmod").textContent = MOD(d.q[1]);
+    const rows = [
+      ["Throughput", d.t[0] + " kbps", d.t[1] + " kbps", d.t[1] - d.t[0], 1],
+      ["Resource blocks / TTI", d.p[0].toFixed(1), d.p[1].toFixed(1), 0, 0],
+      ["Packet delay", d.d[0] + " ms", d.d[1] + " ms", d.d[0] - d.d[1], 1],
+      ["Packets lost", d.l[0].toFixed(1) + "%", d.l[1].toFixed(1) + "%", d.l[0] - d.l[1], 1],
+      ["Failed blocks", d.n[0] + "%", d.n[1] + "%", d.n[0] - d.n[1], 1],
+      ["Modulation", MOD(d.q[0]), MOD(d.q[1]), 0, 0],
+    ];
+    $("pkpi").innerHTML = rows.map(([n, a, b, better, use]) =>
+      `<tr><td>${n}</td><td class="num">${a}</td><td class="num" style="${use && better > 0.5 ? "color:var(--good);font-weight:600" : ""}">${b}</td></tr>`).join("");
+    $("pnote").textContent = me.svc === "idle" ? "Pick a service to start sending data." :
+      d.e ? "You are at a cell edge: PULSE boosts power on your sub-band and corrects your CQI for neighbour interference." :
+      "Move toward a cell edge to see how PULSE protects weak users.";
+    draw();
+  };
+
+  document.querySelectorAll(".seg button").forEach(btn => btn.onclick = () => {
+    me.svc = btn.dataset.svc;
+    document.querySelectorAll(".seg button").forEach(b2 => b2.setAttribute("aria-pressed", b2 === btn));
+    push(); render();
+  });
+  $("nick").oninput = e => { me.nick = clean(e.target.value, 14) || "Phone"; try { localStorage.setItem("pulse-nick", me.nick); } catch (er) {} push(); };
+  $("pmap").onclick = e => {
+    const cv = $("pmap"), r = cv.getBoundingClientRect(), sc = cv.width / (ISD * 3.3);
+    me.x = ((e.clientX - r.left) * cv.width / r.width - cv.width / 2) / sc;
+    me.y = -((e.clientY - r.top) * cv.height / r.height - cv.height / 2) / sc;
+    push(); render();
+  };
+  render();
+  setInterval(render, 1000);
+  getRoom().then(r => {
+    room = r; render();
+    if (!room) return;
+    push();
+    room.onPeers(ch => {
+      const mine = ch.peers.find(p => p.sameTab); if (mine) myPeer = mine.peer;
+      others = ch.peers.filter(p => !p.sameTab && p.presence && p.presence.role === "ue")
+        .map(p => ({ x: num(p.presence.x, -1000, 1000, 0), y: num(p.presence.y, -1000, 1000, 0) }));
+    });
+    room.on("ue", msg => {
+      const d = msg.data && msg.data.ues && myPeer && msg.data.ues[myPeer];
+      if (!d || !Array.isArray(d.t)) return;
+      last = d; lastAt = Date.now(); render();
+    }, () => { room = null; render(); });
+  });
+}
+
+if (location.hash === "#join") bootPhone(); else bootHost();
+window.addEventListener("hashchange", () => location.reload());
+</script>
